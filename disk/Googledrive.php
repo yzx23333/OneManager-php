@@ -795,6 +795,27 @@ class Googledrive {
         }
         return $diskSpace;
     }
+    public function ConduitDown($url) {
+        $res = curl('GET', $url);
+        if ($res['stat']==200) {
+            return output(
+                base64_encode($res['body']),
+                200,
+                [
+                    'Accept-Ranges' => 'bytes',
+                    //'access-control-allow-origin' => '*',
+                    //'access-control-expose-headers' => 'Content-Length, WWW-Authenticate, Location, Accept-Ranges',
+                    'Content-Type' => $files['mime'],
+                    'Cache-Control' => 'max-age=' . $fileConduitCacheTime,
+                    //'Cache-Control' => 'max-age=0',
+                    'Last-Modified' => gmdate('D, d M Y H:i:s T', strtotime($files['time']))
+                ], 
+                true
+            );
+        } else {
+            return output($res['body'], $res['stat']);
+        }
+    }
 
     protected function GDAPI($method, $url, $data = '')
     {
