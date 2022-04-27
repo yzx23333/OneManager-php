@@ -401,6 +401,7 @@ function main($path)
     } else {
         $files = $drive->list_files($path1);
     }
+    //echo "<pre>" . json_encode($files, 448) . "</pre>";
     //if ($path!=='') 
     if ( $files['type']=='folder' && substr($path, -1)!=='/' ) {
         $tmp = path_format($_SERVER['base_disk_path'] . $path . '/');
@@ -483,7 +484,7 @@ function main($path)
                             ['Accept-Ranges' => 'bytes', 'Content-Range' => 'bytes 0-0/' . $files['size'], 'Content-Type' => $files['mime'] ]
                         );
                     }*/
-                    if ($files['size']<$fileConduitSize) return $drive->ConduitDown($files['url']);
+                    if ($files['size']<$fileConduitSize) return $drive->ConduitDown($files['url'], $files['time'], $fileConduitCacheTime);
                 }
                 if ($_SERVER['HTTP_RANGE']!='') $header['Range'] = $_SERVER['HTTP_RANGE'];
                 $header['Location'] = $url;
@@ -501,12 +502,13 @@ function main($path)
         return render_list($path, $files);
     } else {
         if (!isset($files['error'])) {
-            if (is_array($files)) $files['error']['message'] = json_encode($files, JSON_PRETTY_PRINT);
-            else $files['error']['message'] = $files;
-            $files['error']['code'] = 'unknownError';
-            $files['error']['stat'] = 500;
+            if (is_array($files)) {
+                $files['error']['message'] = json_encode($files, JSON_PRETTY_PRINT);
+                $files['error']['code'] = 'unknownError';
+                $files['error']['stat'] = 500;
+            }
         }
-        return message('<div style="margin:8px;"><pre>' . $files['error']['message'] . '</pre></div><a href="javascript:history.back(-1)">'.getconstStr('Back').'</a>', $files['error']['code'], $files['error']['stat']);
+        return message('<div style="margin:8px;"><pre>' . $files.json_encode($files, JSON_PRETTY_PRINT) . '</pre></div><a href="javascript:history.back(-1)">'.getconstStr('Back').'</a>', $files['error']['code'], $files['error']['stat']);
     }
 }
 
