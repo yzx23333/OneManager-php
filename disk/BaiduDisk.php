@@ -87,11 +87,16 @@ class BaiduDisk {
 
             $url = $this->api_url . $this->ext_api_url;
             
-            $url .= 'file?method=list&access_token=' . $this->access_token . '&dir=' . $path;
-            $arr = curl('GET', $url);
+            //$url .= 'file?method=list&access_token=' . $this->access_token . '&dir=' . $path;
+            $url .= 'multimedia?method=listall&access_token=' . $this->access_token . '&path=' . $path . '&web=1';
+            $p = 0;
+            while ($p<3 && !$arr['stat']) {
+                $arr = curl('GET', $url);
+                $p ++;
+            }
             //echo $url . '<br>外' . $arr['stat'] . '<pre>' . json_encode(json_decode($arr['body']), JSON_PRETTY_PRINT) . '</pre>';
             //echo $arr['body'];
-            if ($arr['stat']<500) {
+            if ($arr['stat']==200) {
                 $files = json_decode($arr['body'], true);
                 //echo '<pre>' . json_encode($files, JSON_PRETTY_PRINT) . '</pre>';
                 if ($files['errno']==-9) {
@@ -102,7 +107,8 @@ class BaiduDisk {
                     $files['error']['stat'] = 403;
                     $files['error']['code'] = 'Forbidden';
                     $files['error']['message'] = '';//errmsg
-                } elseif ($files['errno']==0) {
+                } elseif ($files['errno']===0) {
+                    //echo '<pre>正常：' . json_encode($files, JSON_PRETTY_PRINT) . '</pre>';
                     if ($files['list']) { // have item, is folder
                         if ($files['folder']['childCount']>200) {
                             // files num > 200 , then get nextlink
@@ -124,65 +130,90 @@ class BaiduDisk {
                             //}
                             savecache('path_' . $path, $files, $this->disktag);
                         }
-                    } else { // is file
+                    } else { // no item, theck isdir
                         $url = $this->api_url . $this->ext_api_url;
-                        $fsid = $this->list_files(splitlast($path, '/')[0])['list'];//var_dump($fsid);
-                        $fsid = $fsid[strtolower(urldecode(splitlast($path, '/')[1]))];//var_dump($fsid);
-                        $fsid = $fsid['id'];//var_dump($fsid);
-                        //$fsid = $this->list_files(splitlast($path, '/')[0])['list'][splitlast($path, '/')[1]];
-                        //echo 'ID: ' . $fsid . "<br>\n";
-                        //echo 'path: ' . $path;
-                        //var_dump(splitlast($path, '/')[1]);
-                        //var_dump($fsid);
-                        $url .= 'multimedia?method=filemetas&dlink=1&access_token=' . $this->access_token . '&fsids=[' . $fsid . ']';
-                        $arr = curl('GET', $url);
-                        //echo $url . '<br>是文件' . $arr['stat'] . '<pre>' . json_encode(json_decode($arr['body']), 448) . '</pre>';
-                        if ($arr['stat']==200) {
-                            $files = json_decode($arr['body'], true)['list'][0];
-                            $files['url'] = curl('GET', $files[$this->DownurlStrName] . '&access_token=' . $this->access_token, '', ['User-Agent'=>'pan.baidu.com'], 1)['returnhead']['Location'];
-                            $files['list'] = '';
-                            if (in_array(strtolower(splitlast($files['server_filename'],'.')[1]), $exts['txt'])) {
-                                if ($files['size']<1024*1024) {
-                                    if (!(isset($files['content'])&&$files['content']['stat']==200)) {
-                                        $content1 = curl('GET', $files[$this->DownurlStrName]);
-                                        $tmp = null;
-                                        $tmp = json_decode(json_encode($content1), true);
-                                        if ($tmp['body']===null) {
-                                            $txtcode = chkTxtCode($content1['body']);
-                                            if ($txtcode!==false) $tmp['body'] = iconv($txtcode, 'UTF-8//TRANSLIT', $content1['body']);
-                                            $tmp = json_decode(json_encode($tmp), true);
-                                            if ($tmp['body']) $content1['body'] = $tmp['body'];
-                                        }
-                                        $files['content'] = $content1;
-                                    }
-                                } else {
-                                    $files['content']['stat'] = 202;
-                                    $files['content']['body'] = 'File too large.';
-                                }
+                        $fs = $this->list_files(splitlast($path, '/')[0])['list'][strtolower(urldecode(splitlast($path, '/')[1]))];
+                        //var_dump($fs);
+                        if ($fs['type']=='folder') {
+                            // is empty folder
+                            //savecache('path_' . $path, $fs, $this->disktag);
+                            $files = $fs;
+                        } else {
+                            // is file
+                            $fsid = $fs['id'];//var_dump($fsid);
+                            //$fsid = $this->list_files(splitlast($path, '/')[0])['list'][splitlast($path, '/')[1]];
+                            //echo 'ID: ' . $fsid . "<br>\n";
+                            //echo 'path: ' . $path;
+                            //var_dump(splitlast($path, '/')[1]);
+                            //var_dump($fsid);
+                            $url .= 'multimedia?method=filemetas&dlink=1&access_token=' . $this->access_token . '&fsids=[' . $fsid . ']';
+                            $p = 0;
+                            $arr = null;
+                            while ($p<3 && !$arr['stat']) {
+                                $arr = curl('GET', $url);
+                                $p ++;
                             }
-                            if ($files['url']) savecache('path_' . $path, $files, $this->disktag);
+                            //echo $url . '<br>是文件' . $arr['stat'] . '<pre>' . json_encode(json_decode($arr['body']), 448) . '</pre>';
+                            if ($arr['stat']==200) {
+                                $files = json_decode($arr['body'], true)['list'][0];
+                                $files['url'] = curl('GET', $files[$this->DownurlStrName] . '&access_token=' . $this->access_token, '', ['User-Agent'=>'pan.baidu.com'], 1)['returnhead']['Location'];
+                                $files['list'] = '';
+                                if (isset($fs['thumbs'])) $files['thumbs'] = $fs['thumbs'];
+                                //echo strtolower(splitlast($files['filename'],'.')[1]) . '进';
+                                if (in_array(strtolower(splitlast($files['filename'],'.')[1]), $exts['txt'])) {
+                                    if ($files['size']<1024*1024) {
+                                        //echo '进1';
+                                        if (!(isset($files['content'])&&$files['content']['stat']==200)) {
+                                            $content1 = curl('GET', $files['url']);
+                                            $tmp = null;
+                                            $tmp = json_decode(json_encode($content1), true);
+                                            if ($tmp['body']===null) {
+                                                $txtcode = chkTxtCode($content1['body']);
+                                                if ($txtcode!==false) $tmp['body'] = iconv($txtcode, 'UTF-8//TRANSLIT', $content1['body']);
+                                                $tmp = json_decode(json_encode($tmp), true);
+                                                if ($tmp['body']) $content1['body'] = $tmp['body'];
+                                            }
+                                            $files['content'] = $content1;
+                                        }
+                                    } else {
+                                        $files['content']['stat'] = 202;
+                                        $files['content']['body'] = 'File too large.';
+                                    }
+                                }
+                                if ($files['url']) savecache('path_' . $path, $files, $this->disktag);
+                            } elseif ($arr['stat']==0) {
+                                $files['error']['stat'] = 0;
+                                $files['error']['code'] = 'Network error';
+                                $files['error']['message'] = 'Can not connect to ' . substr($url, 0, strpos($url, '?'));
+                            }
                         }
                     }
                 } else {
                     $files['error']['stat'] = 500;
                     $files['error']['code'] = 'Other error';
-                    $files['error']['message'] = $files['errmsg'];
+                    $files['error']['message'] = $arr . "~<br>\n" . json_encode($arr) . "~";
                 }
+            } elseif ($arr['stat']==0) {
+                $files['error']['stat'] = 0;
+                $files['error']['code'] = 'Network error';
+                $files['error']['message'] = 'Can not connect to ' . substr($url, 0, strpos($url, '?'));
             } else {
                 //error_log1($arr['body']);
                 $files = json_decode($arr['body'], true);
-                if (isset($files['error'])) {
-                    $files['error']['stat'] = $arr['stat'];
+                if ($files['errno']==31066) {
+                    $files['error']['stat'] = 404;
+                    $files['error']['code'] = 'Not Found';
+                    $files['error']['message'] = 'NO such file or folder';//errmsg
                 } else {
                     $files['error']['stat'] = 503;
-                    $files['error']['code'] = 'unknownError';
-                    $files['error']['message'] = '~ ' . $arr['body'] . " ~";
+                    $files['error']['code'] = 'unknown Error';
+                    $files['error']['message'] = '~' . $arr['body'] . "~";
                 }
                 //$files = json_decode( '{"unknownError":{ "stat":'.$arr['stat'].',"message":"'.$arr['body'].'"}}', true);
                 //error_log1(json_encode($files, JSON_PRETTY_PRINT));
             }
         }
-        //echo '<pre>' . json_encode($files, JSON_PRETTY_PRINT) . '</pre>';
+        //echo '<pre>format前' . json_encode($files, 448) . '</pre>';
         return $this->files_format($files);
     }
 
@@ -212,6 +243,7 @@ class BaiduDisk {
                     $tmp['list'][$filename]['name'] = $file['server_filename'];
                     $tmp['list'][$filename]['time'] = date('Y-m-d H:i:s', $file['server_mtime']);
                     $tmp['list'][$filename]['size'] = $file['size'];
+                    if (isset($file['thumbs'])) $tmp['list'][$filename]['thumbs'] = $file['thumbs'];
                 }
             } else {
                 $tmp['type'] = 'file';
@@ -221,9 +253,11 @@ class BaiduDisk {
                 $tmp['size'] = $files['size'];
                 $tmp['mime'] = $files['file']['mimeType'];
                 $tmp['url'] = $files['url'];//$files[$this->DownurlStrName];
-                $tmp['content'] = $files['content'];
+                if (isset($files['content'])) $tmp['content'] = $files['content'];
+                if (isset($files['thumbs'])) $tmp['thumbs'] = $files['thumbs'];
             }
-        } elseif (isset($files['error'])) {
+        } elseif (isset($files['type']) || isset($files['error'])) {
+            //echo '<pre>' . json_encode($files, JSON_PRETTY_PRINT) . '</pre>';
             return $files;
         }
         //error_log1(json_encode($tmp));
@@ -388,51 +422,65 @@ class BaiduDisk {
     public function Rename($file, $newname) {
         $oldname = spurlencode($file['name']);
         $oldname = path_format($file['path'] . '/' . $oldname);
-        $data = '{"name":"' . $newname . '"}';
-                //echo $oldname;
-        if ($file['id']) $result = $this->MSAPI('PATCH', "/items/" . $file['id'], $data);
-        else $result = $this->MSAPI('PATCH', $oldname, $data);
-        return output(json_encode($this->files_format(json_decode($result['body'], true))), $result['stat']);
+        $data = 'async=1';
+        $data .= '&filelist=[{"path":"' . $oldname . '","newname":"' . $newname . '"}]';
+        $url = $this->api_url . $this->ext_api_url;
+        $url .= 'file?method=filemanager&access_token=' . $this->access_token . '&opera=rename';
+        $result = curl('POST', $url, $data);
+        if (json_decode($result['body'], true)['errno']===0) return output('{"name":"' . $newname . '"}', 200);
+        else return output($result['body'], $result['stat']);
+        //return output(json_encode($this->files_format(json_decode($result['body'], true))), $result['stat']);
     }
     public function Delete($file) {
         $filename = spurlencode($file['name']);
         $filename = path_format($file['path'] . '/' . $filename);
-                //echo $filename;
-        if ($file['id']) $result = $this->MSAPI('DELETE', "/items/" . $file['id']);
-        else $result = $this->MSAPI('DELETE', $filename);
-        if ($result['stat']!=204) $r_body = json_encode($this->files_format(json_decode($result['body'], true)));
-        return output($r_body, $result['stat']);
-        //return output($result['body'], $result['stat']);
+        $data = 'async=1';
+        $data .= '&filelist=["' . $filename . '"]';
+        $url = $this->api_url . $this->ext_api_url;
+        $url .= 'file?method=filemanager&access_token=' . $this->access_token . '&opera=delete';
+        $result = curl('POST', $url, $data);
+        if (json_decode($result['body'], true)['errno']===0) return output('', 204);
+        else return output($result['body'], $result['stat']);
     }
     public function Encrypt($folder, $passfilename, $pass) {
-        $filename = '/items/' . $folder['id'] . ':/' . urlencode($passfilename);
-        if ($pass==='') {
-            $result = $this->MSAPI('DELETE', $filename);
-        } else {
-            $result = $this->MSAPI('PUT', $filename, $pass);
-        }
+        $result = $this->Create($folder, 'file', $passfilename, $pass);
         $path1 = $folder['path'];
         if ($path1!='/'&&substr($path1, -1)=='/') $path1 = substr($path1, 0, -1);
         savecache('path_' . $path1 . '/?password', '', $this->disktag, 1);
         return output(json_encode($this->files_format(json_decode($result['body'], true))), $result['stat']);
         //return output($result['body'], $result['stat']);
     }
-    public function Move($file, $folder) {
+    public function Move($file, $folder, $replace = 'fail') {
         $filename = spurlencode($file['name']);
         $filename = path_format($file['path'] . '/' . $filename);
-        $data = '{"parentReference":{"path": "/drive/root:' . $folder['path'] . '"}}';
-        if ($file['id']) $result = $this->MSAPI('PATCH', "/items/" . $file['id'], $data);
-        else $result = $this->MSAPI('PATCH', $filename, $data);
+        $data = 'async=1';
+        $data .= '&filelist=[{"path":"' . $filename . '","dest":"' . $folder['path'] . '","newname":"' . $file['name'] . '","ondup":"' . $replace . '"}]';
+        error_log1('data in MOVE: ' . $data);
+        $url = $this->api_url . $this->ext_api_url;
+        $url .= 'file?method=filemanager&access_token=' . $this->access_token . '&opera=move';
+        $result = curl('POST', $url, $data);
+        if (!$result['stat']) $result['stat'] = 501;
         $path2 = spurlencode($folder['path'], '/');
         if ($path2!='/'&&substr($path2, -1)=='/') $path2 = substr($path2, 0, -1);
         savecache('path_' . $path2, json_decode('{}', true), $this->disktag, 1);
-        return output(json_encode($this->files_format(json_decode($result['body'], true))), $result['stat']);
-        //return output($result['body'], $result['stat']);
+        if (json_decode($result['body'], true)['errno']===0) return ['stat'=>200, 'body'=>'{"name":"' . $file['name'] . '"}'];
+        else return output($result['body'], $result['stat']);
+        //return output(json_encode($this->files_format(json_decode($result['body'], true))), $result['stat']);
+        return output($result['body'], $result['stat']);
     }
     public function Copy($file) {
         $filename = spurlencode($file['name']);
         $filename = path_format($file['path'] . '/' . $filename);
-        $namearr = splitlast($file['name'], '.');
+        $data = 'async=0';
+        $data .= '&filelist=[{"path":"' . $filename . '","dest":"' . $file['path'] . '","newname":"' . $file['name'] . '","ondup":"newcopy"}]';
+        $url = $this->api_url . $this->ext_api_url;
+        $url .= 'file?method=filemanager&access_token=' . $this->access_token . '&opera=copy';
+        while ($p<3 && !$result['stat']) {
+            $result = curl('POST', $url, $data);
+            $p++;
+        }
+
+        /*$namearr = splitlast($file['name'], '.');
         date_default_timezone_set('UTC');
         if ($namearr[0]!='') {
             $newname = $namearr[0] . ' (' . date("Ymd\THis\Z") . ')';
@@ -443,7 +491,7 @@ class BaiduDisk {
         $data = '{ "name": "' . $newname . '" }';
         if ($file['id']) $result = $this->MSAPI('copy', "/items/" . $file['id'], $data);
         else $result = $this->MSAPI('copy', $filename, $data);
-        /*$num = 0;
+        $num = 0;
         while ($result['stat']==409 && json_decode($result['body'], true)['error']['code']=='nameAlreadyExists') {
             $num++;
             if ($namearr[0]!='') {
@@ -456,8 +504,10 @@ class BaiduDisk {
             $data = '{ "name": "' . $newname . '" }';
             $result = $this->MSAPI('copy', $filename, $data);
         }*/
-        return output(json_encode($this->files_format(json_decode($result['body'], true))), $result['stat']);
-        //return output($result['body'], $result['stat']);
+        if (json_decode($result['body'], true)['errno']===0) return output('{"name":"' . $file['name'] . '"}', 200);
+        else return output($result['body'], $result['stat']);
+        //return output(json_encode($this->files_format(json_decode($result['body'], true))), $result['stat']);
+        //return output($url . "\n" . $data . "\n" . $result['body'], $result['stat']);
     }
     public function Edit($file, $content) {
         /*TXT一般不会超过4M，不用二段上传
@@ -474,17 +524,97 @@ class BaiduDisk {
     }
     public function Create($parent, $type, $name, $content = '') {
         if ($type=='file') {
-            $filename = spurlencode($name);
-            $filename = path_format($parent['path'] . '/' . $filename);
-            $result = $this->MSAPI('PUT', $filename, $content);
+            $file['path'] = $parent['path'];
+            $file['name'] = $name;
+            $file['size'] = strlen($content);
+            $file['md5s'] = '["' . md5($content) . '"]';
+            $result = $this->preCreate($file);
+            if ($result['stat']==200 && json_decode($result['body'],true)['errno']==0) {
+                $res = json_decode($result['body'], true);
+                if ($res['return_type']==2) {
+                    //已有，秒传？
+                    error_log1('Rapid_upload');
+                    $a = 1;
+                } else {
+                    $result = $this->partUpload($res['path'], $res['uploadid'], 0, $content);
+                    if ($result['stat']==200 && json_decode($result['body'],true)['md5']) {
+                        $md5 = json_decode($result['body'], true)['md5'];
+                        $info['path'] = $res['path'];
+                        $info['size'] = $file['size'];
+                        $info['md5s'] = '["' . $md5 . '"]';
+                        $info['uploadid'] = $res['uploadid'];
+                        $result = $this->completeUpload($info);
+                        if ($result['stat']==200 && json_decode($result['body'],true)['errno']==0) {
+                            $res = json_decode($result['body'], true);
+                            $result = $this->Move(['name'=>$res['server_filename'],'path'=>spurlencode(substr($res['path'], 0, strlen($res['path'])-strlen($res['server_filename'])), '/')], ['path'=>$parent['path']], 'overwrite');
+                        }
+                    }
+                }
+            }
         }
         if ($type=='folder') {
-            $data = '{ "name": "' . $name . '",  "folder": { },  "@microsoft.graph.conflictBehavior": "rename" }';
-            $result = $this->MSAPI('children', $parent['path'], $data);
+            $file['path'] = urldecode($parent['path']) . '/' . $name;
+            $file['size'] = strlen($content);
+            //$file['md5s'] = '["' . md5($content) . '"]';
+            $result = $this->completeUpload($file, 1);
         }
+        if ($result['stat']===0) $result['stat'] = 501;
         //savecache('path_' . $path1, json_decode('{}',true), $_SERVER['disktag'], 1);
-        return output(json_encode($this->files_format(json_decode($result['body'], true))), $result['stat']);
-        //return output($result['body'], $result['stat']);
+        //return output(json_encode($this->files_format(json_decode($result['body'], true))), $result['stat']);
+        return output($result['body'], $result['stat']);
+    }
+    private function preCreate($file, $isdir = 0) {
+        $url = $this->api_url . $this->ext_api_url;
+        $url .= 'file?method=precreate&access_token=' . $this->access_token;
+        //error_log1('url: ' . $url);
+        $data['path'] = path_format('/apps/OneManager/' . $file['path'] . '/' . urlencode($file['name']));
+        $data['size'] = $file['size'];
+        $data['isdir'] = $isdir;
+        $data['block_list'] = $file['md5s'];
+        $data['autoinit'] = 1;
+        $data['rtype'] = 3; // 0: fail, 1: rename, 2: rename when not same, 3: overlay
+        foreach ($data as $key => $value) $formdata .= '&' . $key . '=' . $value;
+        $formdata = substr($formdata, 1);
+        error_log1('data: ' . $formdata);
+        while ($p<3 && !$result['stat']) {
+            $result = curl('POST', $url, $formdata);
+            $p++;
+        }
+        error_log1('res: ' . json_encode($result));
+        return $result;
+    }
+    private function partUpload($path, $uploadid, $partnum, $content) {
+        $url = 'https://d.pcs.baidu.com/rest/2.0/pcs/superfile2?method=upload&access_token=' . $this->access_token . '&type=tmpfile&path=' . $path . '&uploadid=' . $uploadid . '&partseq=' . $partnum;
+        $file = sys_get_temp_dir() . '/' . $uploadid . '_' . $partnum;
+        file_put_contents($file, $content);
+        $data['file'] = '@' . $file;
+        while ($p<3 && !$result['stat']) {
+            $result = curl('POST', $url, $data, ['content-type'=>'multipart/form-data']);
+            $p++;
+        }
+        error_log1('res: ' . json_encode($result));
+        file_put_contents($file, '');
+        return $result;
+    }
+    private function completeUpload($info, $isdir = 0) {
+        $url = $this->api_url . $this->ext_api_url;
+        $url .= 'file?method=create&access_token=' . $this->access_token;
+        //error_log1('url: ' . $url);
+        $data['path'] = urlencode($info['path']);
+        $data['size'] = $info['size'];
+        $data['isdir'] = $isdir;
+        $data['block_list'] = $info['md5s'];
+        $data['uploadid'] = $info['uploadid'];
+        $data['rtype'] = 3; // 0: fail, 1: rename, 2: rename when not same, 3: overlay
+        foreach ($data as $key => $value) $formdata .= '&' . $key . '=' . $value;
+        $formdata = substr($formdata, 1);
+        error_log1('data: ' . $formdata);
+        while ($p<3 && !$result['stat']) {
+            $result = curl('POST', $url, $formdata);
+            $p++;
+        }
+        error_log1('res: ' . json_encode($result));
+        return $result;
     }
 
     public function AddDisk() {
@@ -867,36 +997,6 @@ class BaiduDisk {
         return true;
     }
 
-    protected function get_siteid($sharepointSite)
-    {
-        //$sharepointSite = getConfig('sharepointSite', $this->disktag);
-        while (substr($sharepointSite, -1)=='/') $sharepointSite = substr($sharepointSite, 0, -1);
-        $tmp = splitlast($sharepointSite, '/');
-        if ($tmp[1]==urldecode($tmp[1])) {
-            $sharepointname = urlencode($tmp[1]);
-        } else {
-            $sharepointname = $tmp[1];
-        }
-        $tmp = splitlast($tmp[0], '/');
-        //if (getConfig('Driver', $this->disktag)=='Onedrive') $url = 'https://graph.microsoft.com/v1.0/sites/root:/' . $tmp[1] . '/' . $sharepointname;
-        //if (getConfig('Driver', $this->disktag)=='OnedriveCN') $url = 'https://microsoftgraph.chinacloudapi.cn/v1.0/sites/root:/' . $tmp[1] . '/' . $sharepointname;
-        $url = $this->api_url . '/sites/root:/' . $tmp[1] . '/' . $sharepointname;
-
-        $i=0;
-        $response = [];
-        while ($url!=''&&$response['stat']!=200&&$i<4) {
-            $response = $this->MSAPI('GET', $url);
-            $i++;
-        }
-        if ($response['stat']!=200) {
-            error_log1('failed to get siteid. response' . json_encode($response));
-            $response['body'] .= '\nfailed to get siteid.';
-            return $response;
-            //throw new Exception($response['stat'].', failed to get siteid.'.$response['body']);
-        }
-        return json_decode($response['body'],true)['id'];
-    }
-
     public function del_upload_cache($path)
     {
         error_log1('del.tmp:GET,'.json_encode($_GET,JSON_PRETTY_PRINT));
@@ -918,16 +1018,10 @@ class BaiduDisk {
     {
         $thumb_url = getcache('thumb_'.$path, $this->disktag);
         if ($thumb_url=='') {
-            $url = $this->api_url . $this->ext_api_url;
-            if ($path !== '/') {
-                $url .= ':' . $path;
-                if (substr($url,-1)=='/') $url=substr($url,0,-1);
-            }
-            $url .= ':/thumbnails/0/medium';
-            $files = json_decode($this->MSAPI('GET', $url)['body'], true);
-            if (isset($files['url'])) {
-                savecache('thumb_' . $path, $files['url'], $this->disktag);
-                $thumb_url = $files['url'];
+            $files = $this->list_files(splitlast($path, '/')[0])['list'][strtolower(urldecode(splitlast($path, '/')[1]))];
+            if (isset($files['thumbs'])) {
+                savecache('thumb_' . $path, $files['thumbs']['url2'], $this->disktag);
+                $thumb_url = $files['thumbs']['url2'];
             }
         }
         return $thumb_url;
@@ -993,7 +1087,7 @@ class BaiduDisk {
             $url = 'https://pan.baidu.com/api/quota?access_token=' . $this->access_token;
             $p=0;
             while ($response['stat']==0&&$p<3) {
-                $response = curl('GET', $url );
+                $response = curl('GET', $url);
                 $p++;
             }//return $response['body'];
             $res = json_decode($response['body'], true);
@@ -1005,7 +1099,7 @@ class BaiduDisk {
         }
         return $diskSpace;
     }
-    public function ConduitDown($url) {
+    public function ConduitDown($url, $filetime, $fileConduitCacheTime) {
         $res = curl('GET', $url . '&access_token=' . $this->access_token, '', ['User-Agent'=>'pan.baidu.com'], 0, 1);
         //echo $res['returnhead']['Location'];
         if ($res['stat']==200) {
@@ -1019,7 +1113,7 @@ class BaiduDisk {
                     'Content-Type' => $files['mime'],
                     'Cache-Control' => 'max-age=' . $fileConduitCacheTime,
                     //'Cache-Control' => 'max-age=0',
-                    'Last-Modified' => gmdate('D, d M Y H:i:s T', strtotime($files['time']))
+                    'Last-Modified' => gmdate('D, d M Y H:i:s T', strtotime($filetime))
                 ], 
                 true
             );
