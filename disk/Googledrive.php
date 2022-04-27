@@ -795,7 +795,7 @@ class Googledrive {
         }
         return $diskSpace;
     }
-    public function ConduitDown($url) {
+    public function ConduitDown($url, $filetime, $fileConduitCacheTime) {
         $res = curl('GET', $url);
         if ($res['stat']==200) {
             return output(
@@ -808,7 +808,7 @@ class Googledrive {
                     'Content-Type' => $files['mime'],
                     'Cache-Control' => 'max-age=' . $fileConduitCacheTime,
                     //'Cache-Control' => 'max-age=0',
-                    'Last-Modified' => gmdate('D, d M Y H:i:s T', strtotime($files['time']))
+                    'Last-Modified' => gmdate('D, d M Y H:i:s T', strtotime($filetime))
                 ], 
                 true
             );
