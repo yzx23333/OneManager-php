@@ -847,7 +847,7 @@ class BaiduDisk {
         url="' . $this->oauth_url . 'authorize?response_type=code&client_id=' . $this->client_id . '&redirect_uri=' . $this->redirect_uri . '&scope=' . $this->scope . '&state=' . '"+encodeURIComponent(url);
         document.getElementById(\'a1\').href=url;
         //window.open(url,"_blank");
-        //location.href = url;
+        location.href = url;
     </script>
     ', getconstStr('Wait') . ' 1s', 201);
             //} else {
@@ -920,7 +920,7 @@ class BaiduDisk {
         <br>
         <label><input type="checkbox" name="custom_client" onclick="document.getElementById(\'secret\').style.display=(this.checked?\'\':\'none\');">' . getconstStr('CustomIdSecret') . '</label><br>
         <div id="secret" style="display:none;margin:10px 35px">
-            <a href="" target="_blank">' . getconstStr('GetSecretIDandKEY') . '</a><br>
+            <a href="https://pan.baidu.com/union/console/applist" target="_blank">' . getconstStr('GetSecretIDandKEY') . '</a><br>
             return_uri(Reply URL):<br>' . $this->redirect_uri . '<br>
             client_id:<input type="text" name="client_id" style="width:100%" placeholder="Appkey"><br>
             client_secret:<input type="text" name="client_secret" style="width:100%" placeholder="Secretkey"><br>
