@@ -565,7 +565,8 @@ class BaiduDisk {
                         } else {
                             $res1 = json_decode($result['body'], true);
                             $res1['OMmsg'] = 'err in completeUpload.';
-                            $result['body'] = json_encode($res) . json_encode($res1);
+                            $res1['preCreate_result'] = $res;
+                            $result['body'] = json_encode($res1);
                         }
                     } else {
                         $res = json_decode($result['body'], true);
@@ -630,6 +631,7 @@ class BaiduDisk {
         $url .= 'file?method=create&access_token=' . $this->access_token;
         //error_log1('url: ' . $url);
         $data['path'] = urlencode($info['path']);
+        //$data['path'] = $info['path'];
         $data['size'] = $info['size'];
         $data['isdir'] = $isdir;
         $data['block_list'] = $info['md5s'];
