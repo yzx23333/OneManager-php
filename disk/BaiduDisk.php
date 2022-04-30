@@ -529,6 +529,7 @@ class BaiduDisk {
             $file['size'] = strlen($content);
             $file['md5s'] = '["' . md5($content) . '"]';
             $result = $this->preCreate($file);
+            //echo 'preCreate<pre>' . json_encode($result, 448) . '</pre>';
             if ($result['stat']==200 && json_decode($result['body'],true)['errno']==0) {
                 $res = json_decode($result['body'], true);
                 if ($res['return_type']==2) {
@@ -546,7 +547,10 @@ class BaiduDisk {
                         $result = $this->completeUpload($info);
                         if ($result['stat']==200 && json_decode($result['body'],true)['errno']==0) {
                             $res = json_decode($result['body'], true);
-                            $result = $this->Move(['name'=>$res['server_filename'],'path'=>spurlencode(substr($res['path'], 0, strlen($res['path'])-strlen($res['server_filename'])), '/')], ['path'=>$parent['path']], 'overwrite');
+                            if (substr($res['path'], 0, strlen($res['path'])-strlen($res['server_filename']))!=$parent['path']) {
+                                $result = $this->Move(['name'=>$res['server_filename'],'path'=>spurlencode(substr($res['path'], 0, strlen($res['path'])-strlen($res['server_filename'])), '/')], ['path'=>$parent['path']], 'overwrite');
+                                $this->Delete(['name'=>splitfirst(splitfirst($parent['path'],'/')[1])[0], 'path'=>'/apps/OneManager/']);
+                            }
                         }
                     }
                 }
@@ -567,7 +571,9 @@ class BaiduDisk {
         $url = $this->api_url . $this->ext_api_url;
         $url .= 'file?method=precreate&access_token=' . $this->access_token;
         //error_log1('url: ' . $url);
-        $data['path'] = path_format('/apps/OneManager/' . $file['path'] . '/' . urlencode($file['name']));
+        if (substr($file['path'],0,17)==='/apps/OneManager/') $path = $file['path'];
+        else $path = '/apps/OneManager/' . $file['path'];
+        $data['path'] = path_format($path . '/' . urlencode($file['name']));
         $data['size'] = $file['size'];
         $data['isdir'] = $isdir;
         $data['block_list'] = $file['md5s'];
@@ -580,7 +586,7 @@ class BaiduDisk {
             $result = curl('POST', $url, $formdata);
             $p++;
         }
-        error_log1('res: ' . json_encode($result));
+        error_log1('res_pre: ' . json_encode($result));
         return $result;
     }
     private function partUpload($path, $uploadid, $partnum, $content) {
@@ -592,7 +598,7 @@ class BaiduDisk {
             $result = curl('POST', $url, $data, ['content-type'=>'multipart/form-data']);
             $p++;
         }
-        error_log1('res: ' . json_encode($result));
+        error_log1('res_uping: ' . json_encode($result));
         file_put_contents($file, '');
         return $result;
     }
@@ -613,7 +619,7 @@ class BaiduDisk {
             $result = curl('POST', $url, $formdata);
             $p++;
         }
-        error_log1('res: ' . json_encode($result));
+        error_log1('res_comp: ' . json_encode($result));
         return $result;
     }
 
@@ -718,14 +724,15 @@ class BaiduDisk {
             }
             $url = 'https://pan.baidu.com/rest/2.0/xpan/nas?method=uinfo&access_token=' . $this->access_token;
             $response = json_decode(curl('GET', $url)['body'], true);
-            $html = $response['avatar_url'] . "<br>\n";
-            $html .= $response['baidu_name'] . "<br>\n";
-            $html .= $response['netdisk_name'] . "<br>\n";
+            $html = '头图 ' . $response['avatar_url'] . "<br>\n";
+            $html .= '名 ' . $response['baidu_name'] . "<br>\n";
+            $html .= '名 ' . $response['netdisk_name'] . "<br>\n";
             $html .= $response['errno'] . "<br>\n";
             $html .= $response['errmsg'] . "<br>\n";
             
-            $html .= $this->getDiskSpace();
+            $html .= '空间 ' . $this->getDiskSpace() . "<br>\n";
 
+            $html .= '程序还在测试，上面信息显示正常就请直接去首页。';
             return message($html, $title, 201);
 
             $title = 'Select Driver';
@@ -926,6 +933,7 @@ class BaiduDisk {
             client_secret:<input type="text" name="client_secret" style="width:100%" placeholder="Secretkey"><br>
         </div>
         <br>';
+        $html .= '第三方程序只能在"/apps/程序名/"有上传权限，所以最好将public_path设置为"/apps/OneManager/"。<br>';
         if ($_SERVER['language']=='zh-cn') $html .= '你要理解 scfonedrive.github.io 是github上的静态网站，<br><font color="red">除非github真的挂掉</font>了，<br>不然，稍后你如果<font color="red">连不上</font>，请检查你的运营商或其它“你懂的”问题！<br>';
         $html .='
         <input type="submit" value="' . getconstStr('Submit') . '">
@@ -1036,9 +1044,10 @@ class BaiduDisk {
             $filename = $tmpfile['name'];
         }
         $content = file_get_contents($tmpfile['tmp_name']);
-        $result = $this->MSAPI('PUT', path_format($_SERVER['list_path'] . '/' . $path . '/' . $filename), $content);
-        $res = $this->files_format(json_decode($result['body'], true));
-        if (isset($res['url'])) $res['url'] = $_SERVER['host'] . path_format($_SERVER['base_disk_path'] . '/' . $path . '/' . $filename);
+        $result = $this->Create(['path'=>path_format($_SERVER['list_path'] . '/' . $path . '/')], 'file', $filename, $content);
+        //echo 'Small<pre>' . json_encode($result, 448) . '</pre>';
+        $res = json_decode($result['body'], true);
+        if (isset($res['errno'])&&$res['errno']===0) $res['url'] = $_SERVER['host'] . path_format($_SERVER['base_disk_path'] . '/' . $path . '/' . $filename);
         return output(json_encode($res, JSON_UNESCAPED_SLASHES), $result['stat']);
     }
     public function bigfileupload($path)
