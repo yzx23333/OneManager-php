@@ -563,9 +563,9 @@ class BaiduDisk {
                                 }
                             }
                         } else {
-                            $res = json_decode($result['body'], true);
-                            $res['OMmsg'] = 'err in completUpload.';
-                            $result['body'] = json_encode($res);
+                            $res1 = json_decode($result['body'], true);
+                            $res1['OMmsg'] = 'err in completeUpload.';
+                            $result['body'] = json_encode($res) . json_encode($res1);
                         }
                     } else {
                         $res = json_decode($result['body'], true);
@@ -956,7 +956,7 @@ class BaiduDisk {
             client_secret:<input type="text" name="client_secret" style="width:100%" placeholder="Secretkey"><br>
         </div>
         <br>';
-        $html .= '第三方程序只能在"/apps/程序名/"有上传权限，所以最好将public_path设置为"/apps/' . $this->appName . '/"。<br>';
+        $html .= '第三方程序只能在"/apps/程序名/"有上传权限，所以最好将public_path设置为"/apps/' . $this->appName . '/"。<br><br>';
         if ($_SERVER['language']=='zh-cn') $html .= '你要理解 scfonedrive.github.io 是github上的静态网站，<br><font color="red">除非github真的挂掉</font>了，<br>不然，稍后你如果<font color="red">连不上</font>，请检查你的运营商或其它“你懂的”问题！<br>';
         $html .='
         <input type="submit" value="' . getconstStr('Submit') . '">
