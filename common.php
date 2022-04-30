@@ -1086,7 +1086,7 @@ function needUpdate()
 function output($body, $statusCode = 200, $headers = ['Content-Type' => 'text/html'], $isBase64Encoded = false)
 {
     if (isset($_SERVER['Set-Cookie'])) $headers['Set-Cookie'] = $_SERVER['Set-Cookie'];
-    if (baseclassofdrive()=='Aliyundrive' || baseclassofdrive()=='BaiduDisk') $headers['Referrer-Policy'] = 'no-referrer';
+    if (baseclassofdrive()=='Aliyundrive') $headers['Referrer-Policy'] = 'no-referrer';// || baseclassofdrive()=='BaiduDisk'
     //$headers['Referrer-Policy'] = 'same-origin';
     //$headers['X-Frame-Options'] = 'sameorigin';
     return [
