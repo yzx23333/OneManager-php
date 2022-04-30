@@ -10,9 +10,11 @@ class BaiduDisk {
         $this->disktag = $tag;
         $this->redirect_uri = 'https://scfonedrive.github.io/';
         if (getConfig('client_id', $tag) && getConfig('client_secret', $tag)) {
+            $this->appName = 'OneManager';
             $this->client_id = getConfig('client_id', $tag);
             $this->client_secret = getConfig('client_secret', $tag);
         } else {
+            $this->appName = 'OneManager';
             $this->client_id = 'knLn7Z8S1YkjIKdjXGr1pBOAuSLGNMbr';
             $this->client_secret = 'BC4M3sLexAfjKUPUdgT3YGhT0dgV5X8t';
         }
@@ -463,7 +465,7 @@ class BaiduDisk {
         $path2 = spurlencode($folder['path'], '/');
         if ($path2!='/'&&substr($path2, -1)=='/') $path2 = substr($path2, 0, -1);
         savecache('path_' . $path2, json_decode('{}', true), $this->disktag, 1);
-        if (json_decode($result['body'], true)['errno']===0) return ['stat'=>200, 'body'=>'{"name":"' . $file['name'] . '"}'];
+        if (json_decode($result['body'], true)['errno']===0) return ['stat'=>200, 'body'=>'{"errno":0,"name":"' . $file['name'] . '"}'];
         else return output($result['body'], $result['stat']);
         //return output(json_encode($this->files_format(json_decode($result['body'], true))), $result['stat']);
         return output($result['body'], $result['stat']);
@@ -549,11 +551,32 @@ class BaiduDisk {
                             $res = json_decode($result['body'], true);
                             if (substr($res['path'], 0, strlen($res['path'])-strlen($res['server_filename']))!=$parent['path']) {
                                 $result = $this->Move(['name'=>$res['server_filename'],'path'=>spurlencode(substr($res['path'], 0, strlen($res['path'])-strlen($res['server_filename'])), '/')], ['path'=>$parent['path']], 'overwrite');
-                                $this->Delete(['name'=>splitfirst(splitfirst($parent['path'],'/')[1])[0], 'path'=>'/apps/OneManager/']);
+                                $res = json_decode($result['body'], true);
+                                if ($res['errno']===0) {
+                                    $name1 = splitfirst(splitfirst($parent['path'],'/')[1],'/')[0];
+                                    //echo 'deleting ' . $name1;
+                                    $this->Delete(['name'=>$name1, 'path'=>'/apps/' . $this->appName . '/']);
+                                } else {
+                                    $res = json_decode($result['body'], true);
+                                    $res['OMmsg'] = 'err in Move.';
+                                    $result['body'] = json_encode($res);
+                                }
                             }
+                        } else {
+                            $res = json_decode($result['body'], true);
+                            $res['OMmsg'] = 'err in completUpload.';
+                            $result['body'] = json_encode($res);
                         }
+                    } else {
+                        $res = json_decode($result['body'], true);
+                        $res['OMmsg'] = 'err in partUpload.';
+                        $result['body'] = json_encode($res);
                     }
                 }
+            } else {
+                $res = json_decode($result['body'], true);
+                $res['OMmsg'] = 'err in preCreate.';
+                $result['body'] = json_encode($res);
             }
         }
         if ($type=='folder') {
@@ -571,8 +594,8 @@ class BaiduDisk {
         $url = $this->api_url . $this->ext_api_url;
         $url .= 'file?method=precreate&access_token=' . $this->access_token;
         //error_log1('url: ' . $url);
-        if (substr($file['path'],0,17)==='/apps/OneManager/') $path = $file['path'];
-        else $path = '/apps/OneManager/' . $file['path'];
+        if (substr($file['path'],0,17)==='/apps/' . $this->appName . '/') $path = $file['path'];
+        else $path = '/apps/' . $this->appName . '/' . $file['path'];
         $data['path'] = path_format($path . '/' . urlencode($file['name']));
         $data['size'] = $file['size'];
         $data['isdir'] = $isdir;
@@ -933,7 +956,7 @@ class BaiduDisk {
             client_secret:<input type="text" name="client_secret" style="width:100%" placeholder="Secretkey"><br>
         </div>
         <br>';
-        $html .= '第三方程序只能在"/apps/程序名/"有上传权限，所以最好将public_path设置为"/apps/OneManager/"。<br>';
+        $html .= '第三方程序只能在"/apps/程序名/"有上传权限，所以最好将public_path设置为"/apps/' . $this->appName . '/"。<br>';
         if ($_SERVER['language']=='zh-cn') $html .= '你要理解 scfonedrive.github.io 是github上的静态网站，<br><font color="red">除非github真的挂掉</font>了，<br>不然，稍后你如果<font color="red">连不上</font>，请检查你的运营商或其它“你懂的”问题！<br>';
         $html .='
         <input type="submit" value="' . getconstStr('Submit') . '">
