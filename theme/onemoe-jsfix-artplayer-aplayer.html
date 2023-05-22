@@ -145,7 +145,7 @@
 <!--IsimgFileEnd-->
 <!--IsvideoFileStart-->
                         <div id="video-a0" class="artplayerdiv" style="height: 350px;"></div>                        
-                        <script src="https://unpkg.com/artplayer@4.5.3/dist/artplayer.js"></script>
+                        <script src="https://cdn.staticfile.org/artplayer/5.0.9/artplayer.min.js"></script>
 <!--IsvideoFileEnd-->
 <!--IsmusicFileStart-->
 <script src="//cdn.staticfile.org/aplayer/1.10.1/APlayer.min.js"></script>
@@ -458,8 +458,8 @@ ap = new APlayer({
 </body>
 
 <!--ListStart-->
-<!--MdRequireStart--><link rel="stylesheet" href="//cdn.staticfile.org/github-markdown-css/3.0.1/github-markdown.css">
-<script type="text/javascript" src="//cdn.staticfile.org/marked/0.6.2/marked.min.js"></script><!--MdRequireEnd-->
+<!--MdRequireStart--><link rel="stylesheet" href="//cdn.staticfile.org/github-markdown-css/4.0.0/github-markdown.min.css">
+<script type="text/javascript" src="//cdn.staticfile.org/marked/4.3.0/marked.min.js"></script><!--MdRequireEnd-->
 <!--GuestUploadStart--><script type="text/javascript" src="//cdn.staticfile.org/spark-md5/3.0.0/spark-md5.min.js"></script><!--GuestUploadEnd-->
 <!--AliyundriveUploadJsStart--><script src="https://cdn.staticfile.org/js-sha1/0.6.0/sha1.min.js"></script><!--AliyundriveUploadJsEnd-->
 <!--IsFileStart--><!--IspdfFileStart--><script src="//cdn.staticfile.org/pdf.js/2.3.200/pdf.min.js"></script><!--IspdfFileEnd--><!--IsFileEnd-->
@@ -527,8 +527,7 @@ ap = new APlayer({
     var filename1 = fileurl.substr(0, fileurl.lastIndexOf('.'));
     var art = new Artplayer({
         container: '.artplayerdiv',
-        url: fileurl,
-        whitelist: ['*'],
+        url: fileurl,        
         title: fileurl,
         //autoplay: true,
         pip: true,
@@ -542,11 +541,11 @@ ap = new APlayer({
         hotkey: true,
         playbackRate: true,
         aspectRatio: true,
-        flip: true,
+        //flip: true,
         fullscreen: true,
         fullscreenWeb: true,
-        subtitleOffset: true,
-        miniProgressBar: true,
+        //subtitleOffset: true,
+        //miniProgressBar: true,
         mutex: false,
         volume: 1.0,
         theme: '#23ade5',
@@ -581,7 +580,10 @@ ap = new APlayer({
         },
     });
         art.on('ready', () => {
-           art.autoHeight = true;
+        art.autoHeight();
+        });
+        art.on('resize', () => {
+        art.autoHeight();
         });
 <!--IsvideoFileEnd-->
 <!--IspdfFileStart-->
@@ -626,13 +628,13 @@ ap = new APlayer({
     var $head = document.getElementById('head');
     if ($head) {
         //document.getElementById('head-div').parentNode.insertBefore(document.getElementById('head-div'),document.getElementById('list-div'));
-        $head.innerHTML = marked(document.getElementById('head-md').innerText);
+        $head.innerHTML = marked.parse(document.getElementById('head-md').innerText);
     }
 <!--HeadmdEnd-->
 <!--ReadmemdStart-->
     var $readme = document.getElementById('readme');
     if ($readme) {
-        $readme.innerHTML = marked(document.getElementById('readme-md').innerText);
+        $readme.innerHTML = marked.parse(document.getElementById('readme-md').innerText);
     }
 <!--ReadmemdEnd-->
 <!--ShowThumbnailsStart-->
@@ -1621,7 +1623,7 @@ ap = new APlayer({
     document.getElementById('password1').focus();
 <!--EncryptedEnd-->
 </script>
-<script src="https://cdn.staticfile.org/ionicons/5.5.2/ionicons/ionicons.js"></script>
+<script src="https://cdn.staticfile.org/ionicons/7.1.0/ionicons/ionicons.min.js"></script>
 <!--LoginStart--><script src="https://cdn.staticfile.org/js-sha1/0.6.0/sha1.min.js"></script><!--LoginEnd-->
 <!--customScript-->
 </html>
