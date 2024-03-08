@@ -1200,7 +1200,7 @@ function adminform($name = '', $pass = '', $storage = '', $path = '') {
         xhr.send(null);
     }
 </script>
-<script src="https://www.unpkg.com/js-sha1@0.6.0/src/sha1.js"></script>';
+<script src="?jsFile=sha1.min.js"></script>';
     $html .= '</html>';
     return output($html, $statusCode);
 }
@@ -1455,7 +1455,7 @@ function EnvOpt($needUpdate = 0) {
                     }
                 }
                 unset($tmp['admin']);
-                return output(json_encode($tmp, JSON_PRETTY_PRINT));
+                return output(json_encode($tmp, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
             }
             if ($_POST['config_b'] == 'import') {
                 if (!$_POST['config_t']) return output("{\"Error\": \"Empty config.\"}", 403);
@@ -1527,15 +1527,14 @@ OneManager DIR: ' . __DIR__ . '
 <pre>';
             @ob_start();
             passthru($_POST['cmd'], $cmdstat);
+            if ($cmdstat > 0) $statusCode = 400;
+            if ($cmdstat === 1) $statusCode = 403;
+            if ($cmdstat === 127) $statusCode = 404;
             $html .= '
 stat: ' . $cmdstat . '
 output:
 
-';
-            if ($cmdstat > 0) $statusCode = 400;
-            if ($cmdstat === 1) $statusCode = 403;
-            if ($cmdstat === 127) $statusCode = 404;
-            $html .= htmlspecialchars(ob_get_clean());
+' . htmlspecialchars(ob_get_clean());
             $html .= '</pre>';
         }
         $html .= '
@@ -1669,6 +1668,8 @@ output:
         <td>client_secret</td>
         <td><input type="text" name="client_secret" value="' . getConfig('client_secret', $disktag) . '" placeholder="' . getconstStr('EnvironmentsDescription')['client_secret'] . '" style="width:100%"></td>
     </tr>';
+            if (!$diskok) $frame .= '
+<tr><td></td><td><input type="submit" name="submit1" value="' . getconstStr('Setup') . '"></td></tr>';
         }
         if ($diskok) {
             $frame .= '
@@ -1759,7 +1760,7 @@ output:
     } else {
         if (count($disktags) > 1) {
             $frame = '
-<script src="https://www.unpkg.com/sortablejs@1.14.0/Sortable.min.js"></script>
+<script src="?jsFile=Sortable.min.js"></script>
 <style>
     .sortable-ghost {
         opacity: 0.4;
@@ -1983,7 +1984,7 @@ output:
             $frame .= getconstStr('NotNeedUpdate');
         }*/
         $frame .= '<br><br>
-<script src="https://www.unpkg.com/js-sha1@0.6.0/src/sha1.js"></script>
+<script src="?jsFile=sha1.min.js"></script>
 <table>
     <form id="change_pass" name="change_pass" action="" method="POST" onsubmit="return changePassword(this);">
         <input name="_admin" type="hidden" value="">
